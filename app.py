@@ -52,6 +52,9 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    header[data-testid="stHeader"] {display: none;}
+    [data-testid="stToolbar"] {display: none;}
+    footer {display: none;}
     .block-container {padding-top: 1.4rem; padding-bottom: 2rem;}
     .hero {background: linear-gradient(120deg,#063b2a,#0c6b4a); color:white;
            padding:1.25rem 1.5rem; border-radius:16px; margin-bottom:1rem;}
@@ -245,7 +248,7 @@ if "result" not in st.session_state or run or st.session_state.get("result_key")
 result = st.session_state.result
 summary = summarize_alerts(result)
 
-st.header("3. Analysis results")
+st.header("1. Analysis results")
 st.caption(
     f"Comparing the image from **{before_date}** with **{after_date}**. "
     f"Cloudy or invalid pixels ignored: **{summary['cloud_coverage']:.1%}**."
@@ -254,7 +257,7 @@ st.caption(
 alerts = result["alerts"].copy()
 deforestation_detected = not alerts.empty
 
-st.header("3. Final conclusion")
+st.header("2. Final conclusion")
 st.caption("This analysis gives you the two key answers first.")
 with st.container(border=True):
     conclusion_cols = st.columns(2)
@@ -337,7 +340,7 @@ with right:
         title="Important",
     )
 
-st.header("4. Review the evidence")
+st.header("3. Review the evidence")
 st.caption(
     "Use these maps to understand why an area was flagged. "
     "Green indicates healthier vegetation; red indicates weaker vegetation."
