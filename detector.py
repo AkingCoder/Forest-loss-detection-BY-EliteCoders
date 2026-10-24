@@ -12,8 +12,8 @@ PIXEL_AREA_HA = 0.01
 
 @dataclass(frozen=True)
 class DetectionConfig:
-    alert_threshold: float = 0.72
-    min_patch_pixels: int = 18
+    alert_threshold: float = 0.20
+    min_patch_pixels: int = 8
     cloud_probability_limit: float = 0.45
 
 
@@ -77,6 +77,10 @@ def detect_forest_loss(
         raise ValueError("before and after must both have shape (height, width, 4).")
     if not 0 < config.alert_threshold < 1:
         raise ValueError("alert_threshold must be between 0 and 1.")
+    if config.min_patch_pixels < 1:
+        raise ValueError("min_patch_pixels must be at least 1.")
+    if not 0 <= config.cloud_probability_limit <= 1:
+        raise ValueError("cloud_probability_limit must be between 0 and 1.")
 
     before_ndvi = _index(before[:, :, 1] - before[:, :, 0], before[:, :, 1] + before[:, :, 0])
     after_ndvi = _index(after[:, :, 1] - after[:, :, 0], after[:, :, 1] + after[:, :, 0])
@@ -151,6 +155,7 @@ def summarize_alerts(result: dict[str, np.ndarray | pd.DataFrame]) -> dict[str, 
         else 0.0,
         "valid_pixels": int(np.count_nonzero(valid_mask)),
         "cloud_coverage": float(1 - np.mean(valid_mask)),
+        "max_score": float(np.max(result["alert_score"])) if np.any(valid_mask) else 0.0,
     }
 
 

@@ -58,6 +58,13 @@ st.markdown(
     .hero h1 {margin:0; font-size:2.15rem;}
     .hero p {margin:.35rem 0 0; color:#d8f4e7;}
     div[data-testid="stMetric"] {background:#f5faf7; border-radius:12px; padding:8px 12px;}
+    .conclusion-card {border-radius:14px; padding:1rem 1.1rem; min-height:108px;
+                      border:1px solid #b7d9c7; background:#f1fbf5;}
+    .conclusion-card.alert {border-color:#f0b4ad; background:#fff4f2;}
+    .conclusion-label {font-size:.9rem; font-weight:600; color:#315443; margin-bottom:.35rem;}
+    .conclusion-card.alert .conclusion-label {color:#8b2e25;}
+    .conclusion-value {font-size:1.65rem; font-weight:700; color:#176b3a;}
+    .conclusion-card.alert .conclusion-value {color:#b42318;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -193,9 +200,9 @@ with st.sidebar:
     st.header("2. Configure the scan")
     sensitivity = st.slider(
         "How sensitive should alerts be?",
-        0.50,
+        0.15,
         0.95,
-        0.72,
+        0.20,
         0.01,
         help="Lower values find more possible changes but may include more false alarms. "
         "Higher values show only stronger changes.",
@@ -204,7 +211,7 @@ with st.sidebar:
         "Ignore patches smaller than (pixels)",
         4,
         150,
-        18,
+        8,
         help="Small isolated changes are ignored as likely noise.",
     )
     cloud_limit = st.slider(
@@ -244,38 +251,59 @@ st.caption(
     f"Cloudy or invalid pixels ignored: **{summary['cloud_coverage']:.1%}**."
 )
 
-metric_cols = st.columns(4)
-metric_cols[0].metric(
-    "Possible change areas",
-    summary["patch_count"],
-    help="Separate connected areas that passed the alert threshold.",
-)
-metric_cols[1].metric(
-    "Estimated affected area",
-    f"{summary['loss_area_ha']:.1f} ha",
-    help="Approximate area of all possible change areas. One hectare is 10,000 m².",
-)
-metric_cols[2].metric(
-    "High-confidence area",
-    f"{summary['high_confidence_area_ha']:.1f} ha",
-    help="Area where the model confidence is at least 85%.",
-)
-metric_cols[3].metric(
-    "Clear pixels checked",
-    f"{summary['valid_pixels']:,}",
-    help="Pixels clear enough to compare in both satellite images.",
-)
+alerts = result["alerts"].copy()
+deforestation_detected = not alerts.empty
+
+st.header("3. Final conclusion")
+st.caption("This analysis gives you the two key answers first.")
+with st.container(border=True):
+    conclusion_cols = st.columns(2)
+    with conclusion_cols[0]:
+        st.markdown(
+            f'<div class="conclusion-card"><div class="conclusion-label">'
+            f"1. Affected area</div><div class=\"conclusion-value\">"
+            f"{summary['loss_area_ha']:.2f} ha</div></div>",
+            unsafe_allow_html=True,
+        )
+    with conclusion_cols[1]:
+        card_class = "conclusion-card alert" if deforestation_detected else "conclusion-card"
+        result_text = "Yes - likely" if deforestation_detected else "No - not detected"
+        st.markdown(
+            f'<div class="{card_class}"><div class="conclusion-label">'
+            f"2. Deforestation detected?</div><div class=\"conclusion-value\">"
+            f"{result_text}</div></div>",
+            unsafe_allow_html=True,
+        )
+    if deforestation_detected:
+        st.warning(
+            "The imagery shows a likely forest-loss change. Confirm it with "
+            "higher-resolution imagery or a field visit.",
+            icon="⚠️",
+        )
+    else:
+        st.success(
+            "No significant deforestation was detected with the current settings.",
+            icon="✅",
+        )
 
 left, right = st.columns([1.55, 1])
 with left:
     st.subheader("Where might forest loss have occurred?")
-    st.caption("Yellow and red areas show increasing evidence of change. Grey areas were too cloudy to assess.")
+    st.caption(
+        "Green areas show stable vegetation, while yellow and red areas show "
+        "increasing evidence of change. Grey areas were too cloudy to assess."
+    )
     display = result["alert_score"].copy()
     display[result["valid_mask"] == 0] = np.nan
     fig = go.Figure(
         go.Heatmap(
             z=display,
-            colorscale=[[0, "#eef7f1"], [0.55, "#f5c542"], [1, "#c92a2a"]],
+            colorscale=[
+                [0, "#198754"],
+                [0.45, "#8bc34a"],
+                [0.68, "#f6c343"],
+                [1, "#c62828"],
+            ],
             zmin=0,
             zmax=1,
             hovertemplate="pixel row=%{y}, pixel column=%{x}<br>change score=%{z:.2f}<extra></extra>",
@@ -310,7 +338,10 @@ with right:
     )
 
 st.header("4. Review the evidence")
-st.caption("Use these maps to understand why an area was flagged. Green generally indicates healthier vegetation.")
+st.caption(
+    "Use these maps to understand why an area was flagged. "
+    "Green indicates healthier vegetation; red indicates weaker vegetation."
+)
 evidence_cols = st.columns(3)
 for column, title, image in [
     (evidence_cols[0], "Vegetation before", result["before_ndvi"]),
@@ -320,45 +351,10 @@ for column, title, image in [
     with column:
         shown = image.astype(float).copy()
         shown[result["valid_mask"] == 0] = np.nan
-        scale = "RdYlGn" if "index" in title else "YlOrRd"
+        scale = "RdYlGn" if title.startswith("Vegetation") else "YlOrRd"
         chart = go.Figure(go.Heatmap(z=shown, colorscale=scale, showscale=False))
         chart.update_layout(height=220, margin={"l": 0, "r": 0, "t": 28, "b": 0}, title=title)
         st.plotly_chart(chart, width="stretch")
-
-st.header("Possible change areas to review")
-alerts = result["alerts"].copy()
-if alerts.empty:
-    st.success(
-        "No areas met the current alert settings. Try lowering sensitivity "
-        "or choosing a different location/date range.",
-        title="No possible change areas found",
-    )
-else:
-    shown_alerts = alerts[
-        ["alert_id", "confidence", "area_ha", "row", "column", "dominant_signal", "cloud_free"]
-    ].rename(
-        columns={
-            "alert_id": "Review ID",
-            "confidence": "Confidence",
-            "area_ha": "Estimated area (ha)",
-            "row": "Map row",
-            "column": "Map column",
-            "dominant_signal": "Strongest signal",
-            "cloud_free": "Clear imagery",
-        }
-    )
-    st.caption("Start with the highest-confidence rows. Coordinates are image-pixel positions, not GPS coordinates.")
-    st.dataframe(
-        shown_alerts.style.format({"Confidence": "{:.0%}", "Estimated area (ha)": "{:.2f}"}),
-        width="stretch",
-        hide_index=True,
-    )
-    st.download_button(
-        "Download review list (CSV)",
-        alerts.to_csv(index=False).encode("utf-8"),
-        "vanrakshak_alerts.csv",
-        "text/csv",
-    )
 
 with st.expander("About this prototype and its limitations"):
     st.markdown(
