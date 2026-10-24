@@ -356,19 +356,42 @@ for column, title, image in [
         chart.update_layout(height=220, margin={"l": 0, "r": 0, "t": 28, "b": 0}, title=title)
         st.plotly_chart(chart, width="stretch")
 
-with st.expander("About this prototype and its limitations"):
-    st.markdown(
-        """
-        **Intended use:** rapid prioritization for field verification, not legal
-        deforestation certification. The 10 m alert area is an estimate.
-
-        **Training/testing:** use coarse Global Forest Watch loss labels only to
-        tune thresholds in selected training regions. Keep one complete Indian
-        state (for example Odisha) held out for testing and report precision,
-        recall, F1 and hectares error at the patch level.
-
-        **Known limitations:** shadows, plantations, crop harvests, fire scars,
-        river migration and unmasked clouds can still create false positives.
-        Each alert should be reviewed with a higher-resolution image or field visit.
-        """
-    )
+with st.expander("Image change details"):
+    if alerts.empty:
+        st.info("There are no detected image changes to show.")
+    else:
+        change_table = alerts[
+            ["alert_id", "confidence", "area_ha", "dominant_signal", "cloud_free"]
+        ].rename(
+            columns={
+                "alert_id": "Review ID",
+                "confidence": "Change strength",
+                "area_ha": "Estimated area (ha)",
+                "dominant_signal": "Strongest signal",
+                "cloud_free": "Clear imagery",
+            }
+        )
+        change_table.insert(
+            2,
+            "Confidence",
+            np.where(
+                change_table["Change strength"] >= 0.85,
+                "High",
+                np.where(change_table["Change strength"] >= 0.72, "Medium", "Review"),
+            ),
+        )
+        st.caption(
+            "Each row is a connected area where the satellite images showed "
+            "possible forest change. Start with rows marked High."
+        )
+        st.dataframe(
+            change_table.style.format(
+                {
+                    "Change strength": "{:.0%}",
+                    "Estimated area (ha)": "{:.2f}",
+                    "Clear imagery": "{:.0%}",
+                }
+            ),
+            width="stretch",
+            hide_index=True,
+        )
