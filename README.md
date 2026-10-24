@@ -11,7 +11,9 @@ python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The default demo scene is deterministic, so judges can run the app without API keys or a satellite-data download.
+The app lets you click a location on a map, downloads Sentinel-2 data for a
+small bounding box around that point, and runs the forest-loss detector. An
+`.npz` upload option is also available.
 
 ## Download Sentinel-2 L2A data
 
@@ -69,6 +71,14 @@ import numpy as np
 np.savez("scene.npz", before=before, after=after,
          before_cloud=before_cloud, after_cloud=after_cloud)
 ```
+
+## Select a location in the app
+
+Choose **Select location on map**, click a point in the map, and the app will
+use the selected latitude and longitude to create a WGS84 bounding box and
+download before/after Sentinel-2 scenes. The default box extends `0.005`
+degrees in each direction from the selected point. Sentinel Hub credentials
+are required for this mode.
 
 ## Approach
 

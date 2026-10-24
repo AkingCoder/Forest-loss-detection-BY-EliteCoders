@@ -4,3 +4,5 @@ pandas>=2.0
 plotly>=5.18
 sentinelhub>=3.11
 python-dotenv>=1.0
+folium>=0.16
+streamlit-folium>=0.25
