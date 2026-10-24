@@ -1,0 +1,6 @@
+streamlit>=1.35
+numpy>=1.24
+pandas>=2.0
+plotly>=5.18
+sentinelhub>=3.11
+python-dotenv>=1.0
